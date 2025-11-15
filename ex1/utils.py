@@ -1,6 +1,6 @@
-import math
-import sys
+import math, sys, json, os
 
+DEFAULT_PORT = 1337
 
 def load_users(path):
     """
@@ -67,30 +67,58 @@ def caesar(text, shift):
     return "".join(result)
 
 
-def is_valid_port(port):
-    """
-    Check if a port number is valid (1-65535).
-    """
-    return isinstance(port, int) and 1 <= port <= 65535
-
-
-def read_args():
+def parse_args():
     """
     Read command-line arguments for port number.
     Returns the port number or None if invalid.
     """
 
-    DEFAULT_PORT = 1337
-
-    match len(sys.argv):
-        case 1:
-            return DEFAULT_PORT
-        case 2:
-            port = int(sys.argv[1])
-            if is_valid_port(port):
-                return port
-            else:
-                return None
-        case _:
-            return None
+    if not (2 <= len(sys.argv) <= 3):
+        print(f"Usage: {os.path.basename(sys.argv[0])} users_file [port]")
+        sys.exit(1)
+    users_file = sys.argv[1]
+    if not os.path.isfile(users_file):
+        print(f"Users file not found: {users_file}")
+        sys.exit(1)
+    port = DEFAULT_PORT
+    if len(sys.argv) == 3:
+        try:
+            p = int(sys.argv[2]); assert 1 <= p <= 65535
+            port = p
+        except Exception:
+            print(f"Invalid port number. Using default port {DEFAULT_PORT}.")
+    return users_file, port
         
+
+# Handler function for server.py
+
+
+def handle_lcm(data, client_socket):
+    try:
+        x = int(data.get("x"))
+        y = int(data.get("y"))
+    except (TypeError, ValueError):
+        return json.dumps({"type": "error", "message": "Invalid parameters for LCM."})
+    result = lcm(x, y)
+    return json.dumps({"type": "lcm_result", "result": result})
+
+
+def handle_parentheses(data, client_socket):
+    s = data.get("string")
+    if not isinstance(s, str):
+        return json.dumps({"type": "error", "message": "Invalid parameters for parentheses check."})
+    result = balanced_parentheses(s)
+    if result is None:
+        return json.dumps({"type": "error", "message": "String contains invalid characters."})
+    return json.dumps({"type": "parentheses_result", "balanced": result})
+
+
+def handle_caesar(data, client_socket):
+    text = data.get("text")
+    shift = data.get("shift")
+    if not isinstance(text, str) or not isinstance(shift, int):
+        return json.dumps({"type": "error", "message": "Invalid parameters for Caesar cipher."})
+    result = caesar(text, shift)
+    if result is None:
+        return json.dumps({"type": "error", "message": "Text contains invalid characters."})
+    return json.dumps({"type": "caesar_result", "result": result})

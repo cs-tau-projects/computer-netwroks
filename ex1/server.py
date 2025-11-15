@@ -1,11 +1,39 @@
 import socket, select, json
-from utils import load_users, lcm, balanced_parentheses, caesar, is_valid_port, read_args
+from utils import load_users, parse_args, handle_lcm, handle_parentheses, handle_caesar
 
 DEFAULT_PORT = 1337
 MESSAGE_MAX_SIZE = 4096
 
-def handle_message(client_socket, message, clients, users):
-    pass
+def handle_message(client_socket, message, client, users):
+    try:
+        data = json.loads(message.decode('utf-8'))
+    except json.JSONDecodeError:
+        return json.dumps({"type": "error", "message": "Invalid JSON format."})
+    
+    if not client["authenticated"]:
+        if data.get("type") != "login":
+            return json.dumps({"type": "error", "message": "Please log in first."})
+        
+        username = data.get("username")
+        password = data.get("password")
+        if username in users and users[username] == password:
+            client["authenticated"] = True
+            client["username"] = username
+            return json.dumps({"type": "login_success", "message": f"Hi, {username}, good to see you."})
+        else:
+            return json.dumps({"type": "login_failure", "message": "Failed to login."})
+    
+    # Authenticated user commands
+    cmd_type = data.get("type")
+    match cmd_type:
+        case "lcm":
+            return handle_lcm(data, client_socket)
+        case "parentheses":
+            return handle_parentheses(data, client_socket)
+        case "caesar":
+            return handle_caesar(data, client_socket)
+        case _:
+            return json.dumps({"type": "error", "message": "Unknown command."})
 
 def delete_client(client_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers):
     if client_socket in sockets_list:
@@ -19,12 +47,12 @@ def delete_client(client_socket, sockets_list, clients, client_send_buffers, cli
         pass
 
 def main():
-    port = read_args()
+    users_file, port = parse_args()
     if (port is None):
         print(f"Invalid port number. Using default port {DEFAULT_PORT}.")
         port = DEFAULT_PORT
         
-    users = load_users("users.json") # Dict of {username: password}
+    users = load_users(users_file) # Dict of {username: password}
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
