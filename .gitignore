@@ -1,0 +1,27 @@
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# pytest and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# macOS junk
+.DS_Store
+
+# VS Code / IDE files
+.vscode/
+.idea/
+
+# Logs or generated files
+*.log
+*.tmp
+*.out

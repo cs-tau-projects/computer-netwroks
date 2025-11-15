@@ -2,6 +2,7 @@ import math, sys, json, os
 
 DEFAULT_PORT = 1337
 
+
 def load_users(path):
     """
     Load users from a tab-delimited text file (username<TAB>password).
@@ -122,3 +123,4 @@ def handle_caesar(data, client_socket):
     if result is None:
         return json.dumps({"type": "error", "message": "Text contains invalid characters."})
     return json.dumps({"type": "caesar_result", "result": result})
+
