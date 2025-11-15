@@ -57,6 +57,10 @@ def caesar(text, shift):
     for ch in text:
         if ch == " ":
             result.append(" ")
-        elif ch.isalpha() and ch.lower().isalpha():
+        elif ch.isalpha():
             c = ch.lower()
             k = (ord(c) - 97 + shift) % 26
+            result.append(chr(97 + k))
+        else:
+            return None
+    return "".join(result)
