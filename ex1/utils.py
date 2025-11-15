@@ -2,6 +2,7 @@ import math
 import sys
 
 
+
 def load_users(path):
     """
     Load users from a tab-delimited text file (username<TAB>password).
@@ -94,3 +95,4 @@ def read_args():
         case _:
             return None
         
+    return "".join(result)
