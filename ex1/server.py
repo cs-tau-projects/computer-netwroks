@@ -9,22 +9,31 @@ def handle_message(client_socket, message, client, users):
         data = json.loads(message.decode('utf-8'))
     except json.JSONDecodeError:
         return json.dumps({"type": "error", "message": "Invalid JSON format."})
-    
-    if not client["authenticated"]:
-        if data.get("type") != "login":
-            return json.dumps({"type": "error", "message": "Please log in first."})
-        
-        username = data.get("username")
-        password = data.get("password")
-        if username in users and users[username] == password:
-            client["authenticated"] = True
+    #Deal with authentication
+    cmd_type = data.get("type")
+    fail = json.dumps({"type": "login_failure", "message": "Failed to login."})
+    match client["authenticated"]:
+        case 0:
+            if cmd_type != "login_username":
+                return fail
+            username = data.get("username")
+            if username not in users:
+                return fail
             client["username"] = username
+            client["authenticated"] = 1
+            return None
+        case 1:
+            if cmd_type != "login_password":
+                return fail
+            password = data.get("password")
+            if(users[username] != password):
+                return fail
+            client["authenticated"] = 2
             return json.dumps({"type": "login_success", "message": f"Hi, {username}, good to see you."})
-        else:
-            return json.dumps({"type": "login_failure", "message": "Failed to login."})
+        case 2:
+            pass
     
     # Authenticated user commands
-    cmd_type = data.get("type")
     match cmd_type:
         case "lcm":
             return handle_lcm(data, client_socket)
@@ -76,7 +85,7 @@ def main():
                 client_socket, _ = server_socket.accept()
                 client_socket.setblocking(False)
                 sockets_list.append(client_socket)
-                clients[client_socket] = {"authenticated": False, "username": None}
+                clients[client_socket] = {"authenticated": 0,  "username": None}# 0 for no_auth, 1 for only_username, 2 for fully_auth
                 client_send_buffers[client_socket] = bytearray()
                 clients_recv_buffers[client_socket] = bytearray()
                 greeting = json.dumps({"type": "greeting", "message": "Welcome! Please log in."}) + "\n"
@@ -87,6 +96,8 @@ def main():
                 if not message:
                     # print(f"Closed connection from {clients[notified_socket]['address']}.")
                     delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
+                    if(notified_socket in writeable):
+                        writeable.remove()
                     continue
 
                 buf = clients_recv_buffers[notified_socket]
