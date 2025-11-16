@@ -11,9 +11,6 @@ BURST_SIZE = 4096
 
 
 
-
-
-
 def parse_args():
     """
     Read command-line arguments for port number.
@@ -33,7 +30,7 @@ def parse_args():
             try:
                 server_host = str(sys.argv[1])
             except Exception:
-                print(f"Invalid port number. Using default host {DEFAULT_HOST}.")
+                print(f"Invalid host number. Using default host {DEFAULT_HOST}.")
 
             try:
                 server_port = int(sys.argv[2])
@@ -50,35 +47,36 @@ def parse_args():
 
 def handle_user_input(line):
     length = len(line)
+    retry_answer = (None, -1)
     if(length == 0):
-        return None
+        return retry_answer
     match line[0]:
         case "User:":
             if(length != 2):
-                return (None, -1)
+                return retry_answer
             return (json.dumps({"type": "login_username", "username": line[1]}), 0)
         case "Password:":
             if(length != 2):
-                return (None, -1)
+                return retry_answer
             return (json.dumps({"type": "login_password", "password": line[1]}), 0)
         case "parentheses":
             if(length != 2):
-                return (None, -1)
+                return retry_answer
             return (json.dumps({"type": "parentheses", "string": line[1]}), 0)
         case "lcm:":
             if(length != 3):
-                return (None, -1)
+                return retry_answer
             return (json.dumps({"type": "lcm", "x": line[1], "y": line[2]}), 0)
         case "caesar:":
             if(length != 3):
-                return (None, -1)
+                return retry_answer
             return (json.dumps({"type": "caesar", "text": line[1], "shift": line[2]}), 0)
         case "quit":
             if(length != 1):
-                return (None, -1)
+                return retry_answer
             return (None, -2)
         case _:
-            return (None, -1)
+            return retry_answer
 
 
 def handle_server_input(line):
@@ -103,7 +101,7 @@ def handle_server_input(line):
         case "error":
             print(f"Error: {message}")
         case "login_failure":
-            print(f"Error: {message}")
+            print(message)
         case _:
             print("Error: Unknown response")
 
@@ -114,6 +112,7 @@ def delete_client(client_socket):
     try:
         client_socket.close()
     except OSError:
+        #ignore errors when closing socket
         pass
     exit()
 
@@ -132,37 +131,40 @@ def main():
 
     while(True):
         
-        readable, writeable, _ = select.select([client_socket], [client_socket], [client_socket])
+        readable, writable, _ = select.select([client_socket], [client_socket], [client_socket])
 
         if(client_socket in readable):
 
             message = client_socket.recv(BURST_SIZE)
             if not message:
-                # print(f"Closed connection from {clients[notified_socket]['address']}.")
                 delete_client(client_socket)
-                continue
             
             recv_buf.extend(message)
             if b"\n" in recv_buf:
-                # Hanlde case where message is too long (e.g. we passed some size - throw error?)
+                # Handle case where message is too long (e.g. we passed some size - throw error?)
                 line, _, rest = recv_buf.partition(b"\n")
                 recv_buf = rest
-                response, val = handle_server_input(line)
-                match val:
-                    case 0:
-                        send_buf.extend(response.encode('utf-8') + b"\n")
-                    case -1:
-                        print("invalid user input, try again")
-                    case -2:
-                        delete_client(client_socket)
+                valid = 0
+                while not valid:#repeat until valid input given
+                    response, val = handle_server_input(line)
+                    match val:
+                        case 0:
+                            send_buf.extend(response.encode('utf-8') + b"\n")
+                            valid = 1
+                        case -1:
+                            print("invalid user input, try again")
+                        case -2:
+                            delete_client(client_socket)
 
             
 
             
-        if(client_socket in writeable and len(send_buf) > 0):
-            # Potentialy add try except here
-            sent = client_socket.send(send_buf)
-            send_buf = send_buf[sent:]
+        if(client_socket in writable and len(send_buf) > 0):
+            try:
+                sent = client_socket.send(send_buf)
+                send_buf = send_buf[sent:]
+            except BrokenPipeError:
+                delete_client(client_socket)
 
 
 
