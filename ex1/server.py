@@ -8,7 +8,7 @@ def handle_message(client_socket, message, client, users):
     try:
         data = json.loads(message.decode('utf-8'))
     except json.JSONDecodeError:
-         return None
+        return json.dumps({"type": "error", "message": "Invalid JSON format."})
     #Deal with authentication
     t = data.get("type")
     if not client["authenticated"]:
