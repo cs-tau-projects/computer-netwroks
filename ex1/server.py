@@ -10,31 +10,30 @@ def handle_message(client_socket, message, client, users):
     except json.JSONDecodeError:
         return json.dumps({"type": "error", "message": "Invalid JSON format."})
     #Deal with authentication
-    t = data.get("type")
-    if not client["authenticated"]:
-        fail = json.dumps({"type": "login_failure", "message": "Failed to login."})
-        if(not client["waiting_password"]):
-            if t != "login_username":
+    cmd_type = data.get("type")
+    fail = json.dumps({"type": "login_failure", "message": "Failed to login."})
+    match client["authenticated"]:
+        case 0:
+            if cmd_type != "login_username":
                 return fail
             username = data.get("username")
             if username not in users:
                 return fail
             client["username"] = username
-            client["waiting_password"] = True
+            client["authenticated"] = 1
             return None
-        else:
-            if t != "login_password":
+        case 1:
+            if cmd_type != "login_password":
                 return fail
             password = data.get("password")
             if(users[username] != password):
                 return fail
-            client["authenticated"] = True
-            client["waiting_password"] = False
+            client["authenticated"] = 2
             return json.dumps({"type": "login_success", "message": f"Hi, {username}, good to see you."})
-        
+        case 2:
+            pass
     
     # Authenticated user commands
-    cmd_type = t
     match cmd_type:
         case "lcm":
             return handle_lcm(data, client_socket)
@@ -86,7 +85,7 @@ def main():
                 client_socket, _ = server_socket.accept()
                 client_socket.setblocking(False)
                 sockets_list.append(client_socket)
-                clients[client_socket] = {"authenticated": False, "waiting_password" : False,  "username": None}
+                clients[client_socket] = {"authenticated": 0,  "username": None}# 0 for no_auth, 1 for only_username, 2 for fully_auth
                 client_send_buffers[client_socket] = bytearray()
                 clients_recv_buffers[client_socket] = bytearray()
                 greeting = json.dumps({"type": "greeting", "message": "Welcome! Please log in."}) + "\n"
