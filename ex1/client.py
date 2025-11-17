@@ -25,7 +25,7 @@ def parse_args():
             try:
                 server_host = str(sys.argv[1])
             except Exception:
-                print(f"Invalid port number. Using default host {DEFAULT_HOST}.")
+                print(f"Invalid host. Using default host {DEFAULT_HOST}.")
         case 3:
             try:
                 server_host = str(sys.argv[1])
