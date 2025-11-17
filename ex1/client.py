@@ -23,7 +23,7 @@ def parse_args():
             pass
         case 2:
             try:
-                server_host = int(sys.argv[1])
+                server_host = str(sys.argv[1])
             except Exception:
                 print(f"Invalid port number. Using default host {DEFAULT_HOST}.")
         case 3:
@@ -83,25 +83,24 @@ def handle_server_input(line):
     try:
         data = json.loads(line.decode('utf-8'))
     except json.JSONDecodeError:
-        print("error converting message to Json")
+        data = json.dumps({"type": "error", "message": "error converting message to Json"})
     
     cmd_type = data.get("type")
-    message = data.get("message")
     match cmd_type:
         case "lcm_result":
-            print(message)
+            print(data.get("result"))
         case "parentheses_result":
-            print(message)
+            print(data.get("balanced"))
         case "caesar_result":
-            print(message)
+            print(data.get("result"))
         case "login_success":
-            print(message)
+            print(data.get("message"))
         case "continue":
             pass
         case "error":
-            print(f"Error: {message}")
+            print(f"Error: {data.get("message")}")
         case "login_failure":
-            print(message)
+            print(data.get("message"))
         case _:
             print("Error: Unknown response")
 
@@ -126,7 +125,12 @@ def main():
     send_buf = bytearray()
     recv_buf = bytearray()
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((server_host, server_port))
+
+    try:
+        client_socket.connect((server_host, server_port))
+    except OSError as e:
+        print(f"Could not connect to server at {server_host}:{server_port}: {e}")
+        sys.exit(1)
     
 
     while(True):
