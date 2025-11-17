@@ -81,7 +81,15 @@ def handle_server_input(line):
     
     cmd_type = data.get("type")
     if(cmd_type in RESULT_SET):
-        print(data.get("result"))
+        match cmd_type:
+            case "lcm_result":
+                print("the lcm is: ", data.get("result"), sep='')
+            case "parentheses_result":
+                tmp_res = data.get("result") 
+                answer = "yes" if tmp_res else "no"
+                print("the parentheses are balanced: ",answer, sep='')
+            case "caesar_result":
+                print("the ciphertext is: ", data.get("result"), sep='')
     elif(cmd_type in MESSAGE_SET):
         print(data.get("message"))
     else:    
