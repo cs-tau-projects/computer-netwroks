@@ -1,0 +1,11 @@
+user01	password!123
+user02	qweRTY@456
+user03	passWord#789
+user04	login$321
+user05	secure%654
+user06	keyBoard^987
+user07	data&159
+user08	admin*753
+user09	member(852
+user10	client)951
+max 123456
