@@ -59,7 +59,7 @@ def handle_user_input(line):
             if(length != 2):
                 return retry_answer
             return (json.dumps({"type": "login_password", "password": line[1]}), 0)
-        case "parentheses":
+        case "parentheses:":
             if(length != 2):
                 return retry_answer
             return (json.dumps({"type": "parentheses", "string": line[1]}), 0)
