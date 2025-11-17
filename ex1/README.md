@@ -1,6 +1,10 @@
 # Networking HW-1 Protocol described
 ## Server - Client Communication:
+<<<<<<< HEAD
 All the data is being transferred via JSON, Every function/data type as described:
+=======
+All the data is being transfered via JSON, Every function/data type as described:
+>>>>>>> e29568c5c565b0c9f7782ee5cfbdd153a0debfd8
 - **Flags and Messages**
     - Login Success =   {"type": "login_success", "message": f"Hi, {username}, good to see you."}
     - Login Failure =   {"type": "login_failure", "message": "Failed to login."}

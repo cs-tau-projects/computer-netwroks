@@ -79,8 +79,8 @@ def main():
                 clients[client_socket] = {"authenticated": False, "username": None}
                 client_send_buffers[client_socket] = bytearray()
                 clients_recv_buffers[client_socket] = bytearray()
-                greeting = json.dumps({"type": "greeting", "message": "Welcome! Please log in."}) + "\n"
-                client_send_buffers[client_socket].extend(greeting.encode("utf-8"))
+                greeting = json.dumps({"type": "greeting", "message": "Welcome! Please log in."})
+                client_send_buffers[client_socket].extend(greeting.encode("utf-8") + b"\n")
                 # print(f"Accepted new connection from {client_socket.getpeername()}.")
             else:
                 message = notified_socket.recv(MESSAGE_MAX_SIZE)

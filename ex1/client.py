@@ -22,9 +22,22 @@ def parse_args():
         case 1:
             pass
         case 2:
+<<<<<<< HEAD
             server_host = str(sys.argv[1])
         case 3:
             server_host = str(sys.argv[1])
+=======
+            try:
+                server_host = str(sys.argv[1])
+            except Exception:
+                print(f"Invalid host. Using default host {DEFAULT_HOST}.")
+        case 3:
+            try:
+                server_host = str(sys.argv[1])
+            except Exception:
+                print(f"Invalid host. Using default host {DEFAULT_HOST}.")
+
+>>>>>>> e29568c5c565b0c9f7782ee5cfbdd153a0debfd8
             try:
                 server_port = int(sys.argv[2])
                 assert 1 <= server_port <= 65535
@@ -52,7 +65,7 @@ def handle_user_input(line):
             if(length != 2):
                 return retry_answer
             return (json.dumps({"type": "login_password", "password": line[1]}), 0)
-        case "parentheses":
+        case "parentheses:":
             if(length != 2):
                 return retry_answer
             return (json.dumps({"type": "parentheses", "string": line[1]}), 0)
@@ -91,7 +104,11 @@ def handle_server_input(line):
         case "continue":
             pass
         case "error":
+<<<<<<< HEAD
             print(data.get("message"))
+=======
+            print(f"Error: {data.get('message')}")
+>>>>>>> e29568c5c565b0c9f7782ee5cfbdd153a0debfd8
         case "login_failure":
             print(data.get("message"))
         case "greeting":
