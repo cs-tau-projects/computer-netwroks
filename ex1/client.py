@@ -98,7 +98,7 @@ def handle_server_input(line):
         case "continue":
             pass
         case "error":
-            print(f"Error: {data.get("message")}")
+            print(f"Error: {data.get('message')}")
         case "login_failure":
             print(data.get("message"))
         case _:
