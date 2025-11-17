@@ -94,7 +94,7 @@ def parse_args():
 # Handler function for server.py
 
 
-def handle_lcm(data, client_socket):
+def handle_lcm(data):
     try:
         x = int(data.get("x"))
         y = int(data.get("y"))
@@ -104,19 +104,22 @@ def handle_lcm(data, client_socket):
     return json.dumps({"type": "lcm_result", "result": result})
 
 
-def handle_parentheses(data, client_socket):
+def handle_parentheses(data):
     s = data.get("string")
     if not isinstance(s, str):
         return json.dumps({"type": "error", "message": "Invalid parameters for parentheses check."})
     result = balanced_parentheses(s)
     if result is None:
         return json.dumps({"type": "error", "message": "String contains invalid characters."})
-    return json.dumps({"type": "parentheses_result", "balanced": result})
+    return json.dumps({"type": "parentheses_result", "result": result})
 
 
-def handle_caesar(data, client_socket):
+def handle_caesar(data):
     text = data.get("text")
-    shift = data.get("shift")
+    try:
+        shift = int(data.get("shift"))
+    except (TypeError, ValueError):
+        return json.dumps({"type": "error", "message": "Invalid parameters for LCM."})
     if not isinstance(text, str) or not isinstance(shift, int):
         return json.dumps({"type": "error", "message": "Invalid parameters for Caesar cipher."})
     result = caesar(text, shift)
