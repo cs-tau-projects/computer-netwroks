@@ -4,7 +4,7 @@ from utils import load_users, parse_args, handle_lcm, handle_parentheses, handle
 DEFAULT_PORT = 1337
 MESSAGE_MAX_SIZE = 4096
 
-def handle_message(client_socket, message, client, users):
+def handle_message(message, client, users):
     try:
         data = json.loads(message.decode('utf-8'))
     except json.JSONDecodeError:
@@ -21,7 +21,7 @@ def handle_message(client_socket, message, client, users):
                 return fail
             client["username"] = username
             client["authenticated"] = 1
-            return None
+            return json.dumps({"type": "continue", "message": ""})
         case 1:
             if cmd_type != "login_password":
                 return fail
@@ -36,11 +36,11 @@ def handle_message(client_socket, message, client, users):
     # Authenticated user commands
     match cmd_type:
         case "lcm":
-            return handle_lcm(data, client_socket)
+            return handle_lcm(data)
         case "parentheses":
-            return handle_parentheses(data, client_socket)
+            return handle_parentheses(data)
         case "caesar":
-            return handle_caesar(data, client_socket)
+            return handle_caesar(data)
         case _:
             return json.dumps({"type": "error", "message": "Unknown command."})
 
@@ -110,7 +110,7 @@ def main():
                 while b"\n" in buf:
                     line, _, rest = buf.partition(b"\n")
                     clients_recv_buffers[notified_socket] = rest
-                    response = handle_message(notified_socket, line, clients[notified_socket], users)
+                    response = handle_message(line, clients[notified_socket], users)
                     if response is not None:
                         client_send_buffers[notified_socket].extend(response.encode('utf-8') + b"\n")
 

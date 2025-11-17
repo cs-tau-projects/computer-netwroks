@@ -6,7 +6,8 @@ import select
 DEFAULT_HOST = "127.0.0.1"  # Replace with the actual server address
 DEFAULT_PORT = 1337         # Replace with the server port
 BURST_SIZE = 4096
-
+RESULT_SET = {"lcm_result", "parentheses_result", "caesar_result"}
+MESSAGE_SET = {"error", "login_failure", "greeting", "continue"}
 
 
 
@@ -79,25 +80,12 @@ def handle_server_input(line):
         data = json.dumps({"type": "error", "message": "error converting message to Json"})
     
     cmd_type = data.get("type")
-    match cmd_type:
-        case "lcm_result":
-            print(data.get("result"))
-        case "parentheses_result":
-            print(data.get("result"))
-        case "caesar_result":
-            print(data.get("result"))
-        case "login_success":
-            print(data.get("message"))
-        case "continue":
-            pass
-        case "error":
-            print(data.get("message"))
-        case "login_failure":
-            print(data.get("message"))
-        case "greeting":
-            print(data.get("message"))
-        case _:
-            print("Error: Unknown response")
+    if(cmd_type in RESULT_SET):
+        print(data.get("result"))
+    elif(cmd_type in MESSAGE_SET):
+        print(data.get("message"))
+    else:    
+        print("Error: Unknown response")
 
     return handle_user_input(input().strip().split())
     
