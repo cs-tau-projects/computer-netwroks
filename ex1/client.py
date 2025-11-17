@@ -13,25 +13,18 @@ BURST_SIZE = 4096
 
 def parse_args():
     """
-    Read command-line arguments for port number.
-    Returns the port number or None if invalid.
+    Read command-line arguments for server host and port.
+    Returns a tuple (port, host).
     """
     server_host = DEFAULT_HOST
     server_port = DEFAULT_PORT
-    match len(sys.argv):#Might need to fix case that port given without host
+    match len(sys.argv): # Might need to fix case that port given without host
         case 1:
             pass
         case 2:
-            try:
-                server_host = str(sys.argv[1])
-            except Exception:
-                print(f"Invalid port number. Using default host {DEFAULT_HOST}.")
+            server_host = str(sys.argv[1])
         case 3:
-            try:
-                server_host = str(sys.argv[1])
-            except Exception:
-                print(f"Invalid host number. Using default host {DEFAULT_HOST}.")
-
+            server_host = str(sys.argv[1])
             try:
                 server_port = int(sys.argv[2])
                 assert 1 <= server_port <= 65535
@@ -90,7 +83,7 @@ def handle_server_input(line):
         case "lcm_result":
             print(data.get("result"))
         case "parentheses_result":
-            print(data.get("balanced"))
+            print(data.get("result"))
         case "caesar_result":
             print(data.get("result"))
         case "login_success":
@@ -98,13 +91,15 @@ def handle_server_input(line):
         case "continue":
             pass
         case "error":
-            print(f"Error: {data.get("message")}")
+            print(data.get("message"))
         case "login_failure":
+            print(data.get("message"))
+        case "greeting":
             print(data.get("message"))
         case _:
             print("Error: Unknown response")
 
-    return handle_user_input(input())
+    return handle_user_input(input().strip().split())
     
 
 def delete_client(client_socket):
@@ -147,9 +142,9 @@ def main():
             if b"\n" in recv_buf:
                 # Handle case where message is too long (e.g. we passed some size - throw error?)
                 line, _, rest = recv_buf.partition(b"\n")
-                recv_buf = rest
+                recv_buf = bytearray(rest)
                 valid = 0
-                while not valid:#repeat until valid input given
+                while not valid: # repeat until valid input given
                     response, val = handle_server_input(line)
                     match val:
                         case 0:
