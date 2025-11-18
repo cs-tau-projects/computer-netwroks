@@ -8,4 +8,5 @@ user07	data&159
 user08	admin*753
 user09	member(852
 user10	client)951
-max 123456
+Alice	BetT3RpAas
+max	123456

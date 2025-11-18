@@ -53,16 +53,20 @@ def lcm(x, y):
 def caesar(text, shift):
     """
     Caesar cipher. Only lowercase/uppercase letters and spaces are allowed.
-    Output is always lowercase. If invalid chars found, return None.
+    Output is always lowercase. Handles both positive and negative shifts.
+    If invalid chars found, return None.
     """
     result = []
+    # Handle negative shifts by converting to equivalent positive shift
+    shift = shift % 26
+    
     for ch in text:
         if ch == " ":
             result.append(" ")
         elif ch.isalpha():
             c = ch.lower()
-            k = (ord(c) - 97 + shift) % 26
-            result.append(chr(97 + k))
+            k = (ord(c) - ord('a') + shift) % 26
+            result.append(chr(ord('a') + k))
         else:
             return None
     return "".join(result)
@@ -126,4 +130,3 @@ def handle_caesar(data):
     if result is None:
         return json.dumps({"type": "error", "message": "Text contains invalid characters."})
     return json.dumps({"type": "caesar_result", "result": result})
-
