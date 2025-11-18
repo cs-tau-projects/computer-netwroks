@@ -172,9 +172,7 @@ def handle_server_input(line, client_state):
             print("  quit - Exit the client")
 
         elif cmd_type == "login_failure":
-            client_state["auth_state"] = 0
-            client_state["username"] = None
-            print("CLIENT: Authentication failed. Please start over with: User: username")
+            print("CLIENT: Wrong username. Please try again.")
 
     else:
         print("Error: Unknown response")

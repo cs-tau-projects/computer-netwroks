@@ -31,24 +31,16 @@ def handle_message(message, client, users):
             client["authenticated"] = 1
             return json.dumps({"type": "continue", "message": ""})
         case 1:
-            if cmd_type == "login_username":
-                # Client is starting over after failed login attempt
-                # Reset authentication state to 0 first
-                client["authenticated"] = 0
-                print("SERVER: Client restarting authentication process")
-                username = data.get("username")
-                if username not in users:
-                    print(f"SERVER: Authentication failed - Username '{username}' not found")
-                    return fail
-                client["username"] = username
-                client["authenticated"] = 1
-                return json.dumps({"type": "continue", "message": ""})
-            elif cmd_type != "login_password":
-                print("SERVER: Client sent invalid command before authentication.")
+            if cmd_type != "login_password":
+                print("SERVER: Client sent non-password message when password was expected.")
                 # Signal to disconnect client for unauthorized command
                 return "DISCONNECT"
             password = data.get("password")
-            username = client["username"]  # Get username from client object instead of using local variable
+            username = client["username"] 
+            # Check if the username exists in the users dictionary
+            if username not in users:
+                print(f"SERVER: Authentication failed - Username '{username}' not found")
+                return fail
             if(users[username] != password):
                 print(f"SERVER: Authentication failed - Invalid password for user '{username}'")
                 return fail
