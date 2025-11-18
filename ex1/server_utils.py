@@ -128,5 +128,5 @@ def handle_caesar(data):
         return json.dumps({"type": "error", "message": "Invalid parameters for Caesar cipher."})
     result = caesar(text, shift)
     if result is None:
-        return json.dumps({"type": "error", "message": "Text contains invalid characters."})
+        return json.dumps({"type": "error", "message": "error: invalid input"})
     return json.dumps({"type": "caesar_result", "result": result})
