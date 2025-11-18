@@ -65,10 +65,7 @@ def handle_user_input(line, client_state):
             return result
 
         # Any other command (including trying another username) is not allowed now.
-        print("CLIENT ERROR: Invalid actsrc/financial-transactions/utils/get-money-movements.tsion while waiting for password. Login flow reset.")
-        print("CLIENT: Please start over with: User: username")
-        client_state["auth_state"] = 0
-        client_state["username"] = None
+        print("CLIENT ERROR: Invalid format. Please use 'Password: yourpassword'")
         return retry_answer
 
     match line[0]:
@@ -161,9 +158,9 @@ def handle_server_input(line, client_state):
             client_state["username"] = "username_sent"
             print("\n" + "=" * 60)
             print("CLIENT: USERNAME ACCEPTED. NOW ENTER YOUR PASSWORD.")
-            print("CLIENT: Just type your password directly - no need for 'Password:' prefix")
+            print("CLIENT: Please use the format 'Password: yourpassword'")
             print("=" * 60 + "\n")
-            print("CLIENT: *** IMPORTANT: Only password is accepted now. Any other input will reset login. ***")
+            print("CLIENT: *** IMPORTANT: Only password in the correct format is accepted now. ***")
 
         elif cmd_type == "login_success":
             client_state["auth_state"] = 2

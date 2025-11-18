@@ -21,7 +21,8 @@ def handle_message(message, client, users):
         case 0:
             if cmd_type != "login_username":
                 print("SERVER: Client sent invalid command before authentication.")
-                return fail
+                # Signal to disconnect client for unauthorized command
+                return "DISCONNECT"
             username = data.get("username")
             if username not in users:
                 print(f"SERVER: Authentication failed - Username '{username}' not found")
@@ -30,9 +31,22 @@ def handle_message(message, client, users):
             client["authenticated"] = 1
             return json.dumps({"type": "continue", "message": ""})
         case 1:
-            if cmd_type != "login_password":
+            if cmd_type == "login_username":
+                # Client is starting over after failed login attempt
+                # Reset authentication state to 0 first
+                client["authenticated"] = 0
+                print("SERVER: Client restarting authentication process")
+                username = data.get("username")
+                if username not in users:
+                    print(f"SERVER: Authentication failed - Username '{username}' not found")
+                    return fail
+                client["username"] = username
+                client["authenticated"] = 1
+                return json.dumps({"type": "continue", "message": ""})
+            elif cmd_type != "login_password":
                 print("SERVER: Client sent invalid command before authentication.")
-                return fail
+                # Signal to disconnect client for unauthorized command
+                return "DISCONNECT"
             password = data.get("password")
             username = client["username"]  # Get username from client object instead of using local variable
             if(users[username] != password):
@@ -145,7 +159,13 @@ def main():
                     response = handle_message(line, clients[notified_socket], users)
                     user_id = clients[notified_socket].get('username') or notified_socket.getpeername()
                     print(f"SERVER: Processed message from {user_id}")
-                    if response is not None:
+                    
+                    # Check if client should be disconnected for unauthorized command
+                    if response == "DISCONNECT":
+                        print(f"SERVER: Disconnecting client {user_id} for unauthorized command attempt before authentication")
+                        delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
+                        break
+                    elif response is not None:
                         # Clear previous data from buffer before adding new response
                         # This prevents old responses from being shown after errors
                         client_send_buffers[notified_socket] = bytearray()
