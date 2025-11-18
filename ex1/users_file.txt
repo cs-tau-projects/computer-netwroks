@@ -1,4 +1,4 @@
-user01	password!123
+user01	123
 user02	qweRTY@456
 user03	passWord#789
 user04	login$321
