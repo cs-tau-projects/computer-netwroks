@@ -398,6 +398,7 @@ The client accepts these command formats from user input:
 
 1. **Authentication**:
    - Two-step authentication process
+   - We could not implement proper secure authentication since Username and Password were required to be passed seperatly...
    - Immediate disconnection for protocol violations
    - Clear separation of authentication states
 
