@@ -1,5 +1,5 @@
 import socket, select, json
-from utils import load_users, parse_args, handle_lcm, handle_parentheses, handle_caesar
+from server_utils import load_users, parse_args, handle_lcm, handle_parentheses, handle_caesar
 
 DEFAULT_PORT = 1337
 MESSAGE_MAX_SIZE = 4096
@@ -21,7 +21,8 @@ def handle_message(message, client, users):
         case 0:
             if cmd_type != "login_username":
                 print("SERVER: Client sent invalid command before authentication.")
-                return fail
+                # Signal to disconnect client for unauthorized command
+                return "DISCONNECT"
             username = data.get("username")
             if username not in users:
                 print(f"SERVER: Authentication failed - Username '{username}' not found")
@@ -31,10 +32,15 @@ def handle_message(message, client, users):
             return json.dumps({"type": "continue", "message": ""})
         case 1:
             if cmd_type != "login_password":
-                print("SERVER: Client sent invalid command before authentication.")
-                return fail
+                print("SERVER: Client sent non-password message when password was expected.")
+                # Signal to disconnect client for unauthorized command
+                return "DISCONNECT"
             password = data.get("password")
-            username = client["username"]  # Get username from client object instead of using local variable
+            username = client["username"] 
+            # Check if the username exists in the users dictionary
+            if username not in users:
+                print(f"SERVER: Authentication failed - Username '{username}' not found")
+                return fail
             if(users[username] != password):
                 print(f"SERVER: Authentication failed - Invalid password for user '{username}'")
                 return fail
@@ -58,7 +64,8 @@ def handle_message(message, client, users):
             return handle_caesar(data)
         case _:
             print(f"SERVER: ERROR - Unknown command type: {cmd_type}")
-            return json.dumps({"type": "error", "message": "Unknown command."})
+            # Clear any previous response data to prevent showing it again
+            return json.dumps({"type": "error", "message": "Unknown command or incorrect format. Please check and try again."})
 
 def delete_client(client_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers):
     print(f"SERVER: Closing connection with client {clients.get(client_socket, {}).get('username', 'unknown')}")
@@ -123,11 +130,8 @@ def main():
                 buf = clients_recv_buffers[notified_socket]
                 buf.extend(message)
                 if b"\n" not in clients_recv_buffers[notified_socket]:
-                    # Hanlde case where message is too long (e.g. we passed some size - throw error?)
+                    # Handle case where message is too long (e.g. we passed some size - throw error?)
                     continue
-
-                buf = clients_recv_buffers[notified_socket]
-                buf.extend(message)
 
                 # Process as many complete newline-terminated messages as we have.
                 while True:
@@ -147,17 +151,29 @@ def main():
                     response = handle_message(line, clients[notified_socket], users)
                     user_id = clients[notified_socket].get('username') or notified_socket.getpeername()
                     print(f"SERVER: Processed message from {user_id}")
-                    if response is not None:
+                    
+                    # Check if client should be disconnected for unauthorized command
+                    if response == "DISCONNECT":
+                        print(f"SERVER: Disconnecting client {user_id} for unauthorized command attempt before authentication")
+                        delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
+                        break
+                    elif response is not None:
+                        # Clear previous data from buffer before adding new response
+                        # This prevents old responses from being shown after errors
+                        client_send_buffers[notified_socket] = bytearray()
                         client_send_buffers[notified_socket].extend(response.encode("utf-8") + b"\n")
 
 
         for notified_socket in writeable:
             if notified_socket in clients and len(client_send_buffers[notified_socket]) > 0:
-                # Potentialy add try except here
-                sent = notified_socket.send(client_send_buffers[notified_socket])
-                client_send_buffers[notified_socket] = client_send_buffers[notified_socket][sent:]
-                user_id = clients[notified_socket].get('username') or notified_socket.getpeername()
-                print(f"SERVER: Sent {sent} bytes to {user_id}")
+                try:
+                    sent = notified_socket.send(client_send_buffers[notified_socket])
+                    client_send_buffers[notified_socket] = client_send_buffers[notified_socket][sent:]
+                    user_id = clients[notified_socket].get('username') or notified_socket.getpeername()
+                    print(f"SERVER: Sent {sent} bytes to {user_id}")
+                except Exception as e:
+                    print(f"SERVER: Error sending data to client: {e}")
+                    delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
         
         for notified_socket in exceptional:
             print(f"SERVER: Socket exception for client: {clients[notified_socket].get('address', 'unknown')}")

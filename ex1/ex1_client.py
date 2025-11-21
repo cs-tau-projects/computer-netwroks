@@ -2,9 +2,10 @@ import socket
 import json
 import sys
 import select
+from client_utils import handle_ceasar_input
 
-DEFAULT_HOST = "127.0.0.1"  # Replace with the actual server address
-DEFAULT_PORT = 1337         # Replace with the server port
+DEFAULT_HOST = "localhost"  # Default hostname as required
+DEFAULT_PORT = 1337         # Default port
 BURST_SIZE = 4096
 RESULT_SET = {"lcm_result", "parentheses_result", "caesar_result"}
 MESSAGE_SET = {"error", "login_failure", "greeting", "continue", "login_success"}
@@ -26,9 +27,12 @@ def parse_args():
             server_host = str(sys.argv[1])
             try:
                 server_port = int(sys.argv[2])
-                assert 1 <= server_port <= 65535
+                if not (1 <= server_port <= 65535):
+                    print(f"Invalid port number. Using default port {DEFAULT_PORT}.")
+                    server_port = DEFAULT_PORT
             except Exception:
                 print(f"Invalid port number. Using default port {DEFAULT_PORT}.")
+                server_port = DEFAULT_PORT
         case _:
             print("Invalid number of args")
             exit()
@@ -43,6 +47,9 @@ def handle_user_input(line, client_state):
         return retry_answer
 
     print(f"CLIENT: Processing user input: {' '.join(line)}")
+    
+    # Clear any previous response to prevent it from being displayed again after an error
+    client_state["last_response_cleared"] = False
 
     if client_state["auth_state"] == 1 and length > 0:
         # Allow quitting at any time
@@ -61,10 +68,7 @@ def handle_user_input(line, client_state):
             return result
 
         # Any other command (including trying another username) is not allowed now.
-        print("CLIENT ERROR: Invalid action while waiting for password. Login flow reset.")
-        print("CLIENT: Please start over with: User: username")
-        client_state["auth_state"] = 0
-        client_state["username"] = None
+        print("CLIENT ERROR: Invalid format. Please use 'Password: yourpassword'")
         return retry_answer
 
     match line[0]:
@@ -93,11 +97,17 @@ def handle_user_input(line, client_state):
             print(f"CLIENT: Sending LCM request for values: {line[1]} and {line[2]}")
             return (json.dumps({"type": "lcm", "x": line[1], "y": line[2]}), 0)
 
-        case "caesar:":
-            if length != 3:
+        case "caesar:" | "ceasar:":  # Handle both correct spelling and common misspelling
+            # Join all arguments after the command
+            if len(line) < 2:  # Need at least command and some text
                 return retry_answer
-            print(f"CLIENT: Sending Caesar cipher request with shift: {line[2]}")
-            return (json.dumps({"type": "caesar", "text": line[1], "shift": line[2]}), 0)
+            # Join all arguments after the command to create a single string
+            text_and_shift = " ".join(line[1:])
+            ceasar_response = handle_ceasar_input(text_and_shift)
+            if ceasar_response is None:
+                return retry_answer
+            print(f"CLIENT: Sending Caesar cipher request with shift: {ceasar_response[1]}")
+            return (json.dumps({"type": "caesar", "text": ceasar_response[0], "shift": ceasar_response[1]}), 0)
 
         case "quit":
             if length != 1:
@@ -110,6 +120,11 @@ def handle_user_input(line, client_state):
 
 
 def handle_server_input(line, client_state):
+    # Check if we should skip displaying a response after an invalid input
+    if client_state.get("last_response_cleared", False):
+        client_state["last_response_cleared"] = False
+        return handle_user_input(input().strip().split(), client_state)
+        
     print("CLIENT: Received response from server")
     try:
         data = json.loads(line.decode('utf-8'))
@@ -119,7 +134,17 @@ def handle_server_input(line, client_state):
         data = {"type": "error", "message": "error converting message to Json"}
 
     cmd_type = data.get("type")
-    if cmd_type in RESULT_SET:
+    # Handle error responses explicitly to prevent showing previous responses
+    if cmd_type == "error":
+        print("\n" + data.get("message"))
+        print("\nCLIENT: Command failed. Please try again.")
+        if client_state["auth_state"] == 2:
+            print("CLIENT: You can use the following commands:")
+            print("  lcm: x y - Calculate least common multiple")
+            print("  parentheses: string - Check if parentheses are balanced")
+            print("  caesar: text shift - Apply Caesar cipher")
+            print("  quit - Exit the client")
+    elif cmd_type in RESULT_SET:
         match cmd_type:
             case "lcm_result":
                 print("the lcm is: ", data.get("result"), sep='')
@@ -136,9 +161,9 @@ def handle_server_input(line, client_state):
             client_state["username"] = "username_sent"
             print("\n" + "=" * 60)
             print("CLIENT: USERNAME ACCEPTED. NOW ENTER YOUR PASSWORD.")
-            print("CLIENT: Just type your password directly - no need for 'Password:' prefix")
+            print("CLIENT: Please use the format 'Password: yourpassword'")
             print("=" * 60 + "\n")
-            print("CLIENT: *** IMPORTANT: Only password is accepted now. Any other input will reset login. ***")
+            print("CLIENT: *** IMPORTANT: Only password in the correct format is accepted now. ***")
 
         elif cmd_type == "login_success":
             client_state["auth_state"] = 2
@@ -150,9 +175,7 @@ def handle_server_input(line, client_state):
             print("  quit - Exit the client")
 
         elif cmd_type == "login_failure":
-            client_state["auth_state"] = 0
-            client_state["username"] = None
-            print("CLIENT: Authentication failed. Please start over with: User: username")
+            print("CLIENT: Wrong username. Please try again.")
 
     else:
         print("Error: Unknown response")
@@ -218,6 +241,8 @@ def main():
                             valid = 1
                         case -1:
                             print("Invalid user input, try again")
+                            # Mark that we should skip displaying the previous response
+                            client_state["last_response_cleared"] = True
                         case -2:
                             delete_client(client_socket)
 
