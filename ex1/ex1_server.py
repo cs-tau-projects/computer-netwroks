@@ -1,99 +1,27 @@
+#!/usr/bin/python3
+
 import socket, select, json
-from server_utils import load_users, parse_args, handle_lcm, handle_parentheses, handle_caesar
+import general_utils
+from server_utils import load_users, parse_args, delete_client, handle_message
+from general_utils import print_strings
 
 DEFAULT_PORT = 1337
 MESSAGE_MAX_SIZE = 4096
 
-def handle_message(message, client, users):
-    print("SERVER: Received message from client")
-    try:
-        data = json.loads(message.decode('utf-8'))
-        print(f"SERVER: Message type: {data.get('type', 'unknown')}")
-        
-    except json.JSONDecodeError:
-        print("SERVER: ERROR - Invalid JSON format received")
-        return json.dumps({"type": "error", "message": "Invalid JSON format."})
-    #Deal with authentication
-    cmd_type = data.get("type")
-    fail = json.dumps({"type": "login_failure", "message": "Failed to login."})
-    print(f"SERVER: Client authentication state: {client['authenticated']}")
-    match client["authenticated"]:
-        case 0:
-            if cmd_type != "login_username":
-                print("SERVER: Client sent invalid command before authentication.")
-                # Signal to disconnect client for unauthorized command
-                return "DISCONNECT"
-            username = data.get("username")
-            if username not in users:
-                print(f"SERVER: Authentication failed - Username '{username}' not found")
-                return fail
-            client["username"] = username
-            client["authenticated"] = 1
-            return json.dumps({"type": "continue", "message": ""})
-        case 1:
-            if cmd_type != "login_password":
-                print("SERVER: Client sent non-password message when password was expected.")
-                # Signal to disconnect client for unauthorized command
-                return "DISCONNECT"
-            password = data.get("password")
-            username = client["username"] 
-            # Check if the username exists in the users dictionary
-            if username not in users:
-                print(f"SERVER: Authentication failed - Username '{username}' not found")
-                return fail
-            if(users[username] != password):
-                print(f"SERVER: Authentication failed - Invalid password for user '{username}'")
-                return fail
-            client["authenticated"] = 2
-            print(f"SERVER: User '{username}' successfully authenticated")
-            return json.dumps({"type": "login_success", "message": f"Hi, {username}, good to see you."})
-        case 2:
-            print("Client is authenticated.")
-            pass
-    
-    # Authenticated user commands
-    match cmd_type:
-        case "lcm":
-            print(f"SERVER: Processing LCM command with values {data.get('x')} and {data.get('y')}")
-            return handle_lcm(data)
-        case "parentheses":
-            print(f"SERVER: Processing parentheses validation for string: {data.get('string')}")
-            return handle_parentheses(data)
-        case "caesar":
-            print(f"SERVER: Processing Caesar cipher with shift {data.get('shift')}")
-            return handle_caesar(data)
-        case _:
-            print(f"SERVER: ERROR - Unknown command type: {cmd_type}")
-            # Clear any previous response data to prevent showing it again
-            return json.dumps({"type": "error", "message": "Unknown command or incorrect format. Please check and try again."})
-
-def delete_client(client_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers):
-    print(f"SERVER: Closing connection with client {clients.get(client_socket, {}).get('username', 'unknown')}")
-    if client_socket in sockets_list:
-        sockets_list.remove(client_socket)
-    clients.pop(client_socket, None)
-    client_send_buffers.pop(client_socket, None)
-    clients_recv_buffers.pop(client_socket, None)
-    try:
-        client_socket.close()
-    except OSError:
-        pass
-
 def main():
     users_file, port = parse_args()
-    if (port is None):
-        print(f"SERVER: Invalid port number. Using default port {DEFAULT_PORT}.")
-        port = DEFAULT_PORT
-        
+    
     users = load_users(users_file) # Dict of {username: password}
-    print(f"SERVER: Loaded {len(users)} users from file: {users_file}")
+    print_strings(general_utils.verbose, 
+        f"SERVER: Loaded {len(users)} users from file: {users_file}",
+        f"SERVER: Listening on port {port}..."
+    )
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.setblocking(False)
     server_socket.bind(("", port))
     server_socket.listen(5)
-    print(f"SERVER: Listening on port {port}...")
 
     sockets_list = [server_socket]
     clients = {}
@@ -117,14 +45,14 @@ def main():
                 client_send_buffers[client_socket].extend(greeting.encode("utf-8"))
                 client_address = client_socket.getpeername()
                 clients[client_socket]["address"] = client_address
-                print(f"SERVER: New connection accepted from {client_address}")
+                print_strings(general_utils.verbose, f"SERVER: New connection accepted from {client_address}")
             else:
                 message = notified_socket.recv(MESSAGE_MAX_SIZE)
                 if not message:
-                    print(f"SERVER: Client disconnected: {clients[notified_socket].get('address', 'unknown')}")
+                    print_strings(general_utils.verbose, f"SERVER: Client disconnected: {clients[notified_socket].get('address', 'unknown')}")
                     delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
                     if(notified_socket in writeable):
-                        writeable.remove()
+                        writeable.remove(notified_socket)
                     continue
 
                 buf = clients_recv_buffers[notified_socket]
@@ -150,11 +78,11 @@ def main():
                     # Process the message
                     response = handle_message(line, clients[notified_socket], users)
                     user_id = clients[notified_socket].get('username') or notified_socket.getpeername()
-                    print(f"SERVER: Processed message from {user_id}")
+                    print_strings(general_utils.verbose, f"SERVER: Processed message from {user_id}")
                     
                     # Check if client should be disconnected for unauthorized command
                     if response == "DISCONNECT":
-                        print(f"SERVER: Disconnecting client {user_id} for unauthorized command attempt before authentication")
+                        print_strings(general_utils.verbose, f"SERVER: Disconnecting client {user_id} for unauthorized command attempt before authentication")
                         delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
                         break
                     elif response is not None:
@@ -170,13 +98,13 @@ def main():
                     sent = notified_socket.send(client_send_buffers[notified_socket])
                     client_send_buffers[notified_socket] = client_send_buffers[notified_socket][sent:]
                     user_id = clients[notified_socket].get('username') or notified_socket.getpeername()
-                    print(f"SERVER: Sent {sent} bytes to {user_id}")
+                    print_strings(general_utils.verbose, f"SERVER: Sent {sent} bytes to {user_id}")
                 except Exception as e:
-                    print(f"SERVER: Error sending data to client: {e}")
+                    print_strings(general_utils.verbose, f"SERVER: Error sending data to client: {e}")
                     delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
         
         for notified_socket in exceptional:
-            print(f"SERVER: Socket exception for client: {clients[notified_socket].get('address', 'unknown')}")
+            print_strings(general_utils.verbose, f"SERVER: Socket exception for client: {clients[notified_socket].get('address', 'unknown')}")
             delete_client(notified_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers)
 
 
