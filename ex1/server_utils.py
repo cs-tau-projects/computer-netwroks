@@ -1,7 +1,85 @@
+#!/usr/bin/python3
+
 import math, sys, json, os
+import general_utils
+from general_utils import print_strings
 
 DEFAULT_PORT = 1337
+# Using verbose flag from general_utils
 
+
+def handle_message(message, client, users):
+    print_strings(general_utils.verbose, "SERVER: Received message from client")
+    try:
+        data = json.loads(message.decode('utf-8'))
+        print_strings(general_utils.verbose, f"SERVER: Message type: {data.get('type', 'unknown')}")
+        
+    except json.JSONDecodeError:
+        print_strings(general_utils.verbose, "SERVER: ERROR - Invalid JSON format received")
+        return json.dumps({"type": "error", "message": "Invalid JSON format."})
+    #Deal with authentication
+    cmd_type = data.get("type")
+    fail = json.dumps({"type": "login_failure", "message": "Failed to login."})
+    print_strings(general_utils.verbose, f"SERVER: Client authentication state: {client['authenticated']}")
+    if client["authenticated"] == 0:
+        if cmd_type != "login_username":
+            print_strings(general_utils.verbose, "SERVER: Client sent invalid command before authentication.")
+            # Signal to disconnect client for unauthorized command
+            return "DISCONNECT"
+        username = data.get("username")
+        if username not in users:
+            print_strings(general_utils.verbose, f"SERVER: Authentication failed - Username '{username}' not found")
+            return fail
+        client["username"] = username
+        client["authenticated"] = 1
+        return json.dumps({"type": "continue", "message": ""})
+    elif client["authenticated"] == 1:
+        if cmd_type != "login_password":
+            print_strings(general_utils.verbose, "SERVER: Client sent non-password message when password was expected.")
+            # Signal to disconnect client for unauthorized command
+            return "DISCONNECT"
+        password = data.get("password")
+        username = client["username"] 
+        # Check if the username exists in the users dictionary
+        if username not in users:
+            print_strings(general_utils.verbose, f"SERVER: Authentication failed - Username '{username}' not found")
+            return fail
+        if(users[username] != password):
+            print_strings(general_utils.verbose, f"SERVER: Authentication failed - Invalid password for user '{username}'")
+            return fail
+        client["authenticated"] = 2
+        print_strings(general_utils.verbose, f"SERVER: User '{username}' successfully authenticated")
+        return json.dumps({"type": "login_success", "message": f"Hi {username}, good to see you."})
+    elif client["authenticated"] == 2:
+        print_strings(general_utils.verbose, "Client is authenticated.")
+        pass
+    
+    # Authenticated user commands
+    if cmd_type == "lcm":
+        print_strings(general_utils.verbose, f"SERVER: Processing LCM command with values {data.get('x')} and {data.get('y')}")
+        return handle_lcm(data)
+    elif cmd_type == "parentheses":
+        print_strings(general_utils.verbose, f"SERVER: Processing parentheses validation for string: {data.get('string')}")
+        return handle_parentheses(data)
+    elif cmd_type == "caesar":
+        print_strings(general_utils.verbose, f"SERVER: Processing Caesar cipher with shift {data.get('shift')}")
+        return handle_caesar(data)
+    else:
+        print_strings(general_utils.verbose, f"SERVER: ERROR - Unknown command type: {cmd_type}")
+        # Clear any previous response data to prevent showing it again
+        return json.dumps({"type": "error", "message": "Unknown command or incorrect format. Please check and try again."})
+
+def delete_client(client_socket, sockets_list, clients, client_send_buffers, clients_recv_buffers):
+    print_strings(general_utils.verbose, f"SERVER: Closing connection with client {clients.get(client_socket, {}).get('username', 'unknown')}")
+    if client_socket in sockets_list:
+        sockets_list.remove(client_socket)
+    clients.pop(client_socket, None)
+    client_send_buffers.pop(client_socket, None)
+    clients_recv_buffers.pop(client_socket, None)
+    try:
+        client_socket.close()
+    except OSError:
+        pass
 
 def load_users(path):
     """
@@ -74,24 +152,46 @@ def caesar(text, shift):
 
 def parse_args():
     """
-    Read command-line arguments for port number.
-    Returns the port number or None if invalid.
+    Read command-line arguments for port number and verbose option.
+    Returns a tuple (users_file, port).
+    Sets the global verbose flag if --verbose is present.
     """
-
-    if not (2 <= len(sys.argv) <= 3):
-        print(f"Usage: {os.path.basename(sys.argv[0])} users_file [port]")
+    # Create a copy of args to process
+    args = sys.argv[1:]
+    
+    # Check for --verbose flag anywhere in the arguments
+    if "--verbose" in args:
+        general_utils.verbose = True
+        args.remove("--verbose")
+        print("Verbose mode enabled")  # Direct print to verify flag is processed
+    
+    # Now check remaining args
+    if not (1 <= len(args) <= 2):
+        print(f"Usage: {os.path.basename(sys.argv[0])} users_file [port] [--verbose]")
         sys.exit(1)
-    users_file = sys.argv[1]
+        
+    users_file = args[0]
     if not os.path.isfile(users_file):
-        print(f"Users file not found: {users_file}")
-        sys.exit(1)
+        # Try relative path from the script's directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        full_path = os.path.join(script_dir, users_file)
+        if os.path.isfile(full_path):
+            users_file = full_path
+        else:
+            print(f"Users file not found: {users_file}")
+            sys.exit(1)
+        
     port = DEFAULT_PORT
-    if len(sys.argv) == 3:
+    if len(args) == 2:
         try:
-            p = int(sys.argv[2]); assert 1 <= p <= 65535
-            port = p
+            p = int(args[1])
+            if 1 <= p <= 65535:
+                port = p
+            else:
+                print(f"Invalid port number. Using default port {DEFAULT_PORT}.")
         except Exception:
             print(f"Invalid port number. Using default port {DEFAULT_PORT}.")
+            
     return users_file, port
         
 
@@ -123,7 +223,7 @@ def handle_caesar(data):
     try:
         shift = int(data.get("shift"))
     except (TypeError, ValueError):
-        return json.dumps({"type": "error", "message": "Invalid parameters for LCM."})
+        return json.dumps({"type": "error", "message": "Invalid parameters for Caesar cipher."})
     if not isinstance(text, str) or not isinstance(shift, int):
         return json.dumps({"type": "error", "message": "Invalid parameters for Caesar cipher."})
     result = caesar(text, shift)
